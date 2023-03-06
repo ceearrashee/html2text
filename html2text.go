@@ -21,7 +21,7 @@ type Options struct {
 	TextOnly            bool                 // Returns only plain text
 }
 
-// PrettyTablesOptions overrides tablewriter behaviors
+// PrettyTablesOptions overrides table-writer behaviors
 type PrettyTablesOptions struct {
 	AutoFormatHeader     bool
 	AutoWrapText         bool
@@ -151,7 +151,7 @@ func (ctx *textifyTraverseContext) handleElement(node *html.Node) error {
 	case atom.Br:
 		return ctx.emit("\n")
 
-	case atom.H1, atom.H2, atom.H3:
+	case atom.H1, atom.H2, atom.H3, atom.H4, atom.H5, atom.H6:
 		subCtx := textifyTraverseContext{}
 		if err := subCtx.traverseChildren(node); err != nil {
 			return err
@@ -167,17 +167,10 @@ func (ctx *textifyTraverseContext) handleElement(node *html.Node) error {
 				dividerLen = lineLen - 1
 			}
 		}
-		var divider string
-		if node.DataAtom == atom.H1 {
-			divider = strings.Repeat("*", dividerLen)
-		} else {
-			divider = strings.Repeat("-", dividerLen)
-		}
 
-		if node.DataAtom == atom.H3 {
-			return ctx.emit("\n\n" + str + "\n" + divider + "\n\n")
-		}
-		return ctx.emit("\n\n" + divider + "\n" + str + "\n" + divider + "\n\n")
+		divider := strings.Repeat(" ", dividerLen)
+
+		return ctx.emit("\n\n" + divider + "\n" + strings.ToUpper(str) +  "\n\n")
 
 	case atom.Blockquote:
 		ctx.blockquoteLevel++
@@ -222,7 +215,7 @@ func (ctx *textifyTraverseContext) handleElement(node *html.Node) error {
 
 	case atom.Li:
 		if !ctx.options.TextOnly {
-			if err := ctx.emit("* "); err != nil {
+			if err := ctx.emit("• "); err != nil {
 				return err
 			}
 		}
@@ -243,7 +236,7 @@ func (ctx *textifyTraverseContext) handleElement(node *html.Node) error {
 		if ctx.options.TextOnly {
 			return ctx.emit(str + ".")
 		}
-		return ctx.emit("*" + str + "*")
+		return ctx.emit(str)
 
 	case atom.A:
 		linkText := ""
@@ -323,7 +316,7 @@ func (ctx *textifyTraverseContext) handleTableElement(node *html.Node) error {
 			return err
 		}
 
-		// Re-intialize all table context.
+		// Re-initialize all table context.
 		ctx.tableCtx.init()
 
 		// Browse children, enriching context with table data.
@@ -475,7 +468,7 @@ func (ctx *textifyTraverseContext) breakLongLines(data string) []string {
 		return []string{data}
 	}
 	var (
-		ret      = []string{}
+		ret      []string
 		runes    = []rune(data)
 		l        = len(runes)
 		existing = ctx.lineLength
@@ -517,7 +510,7 @@ func (ctx *textifyTraverseContext) normalizeHrefLink(link string) string {
 }
 
 // renderEachChild visits each direct child of a node and collects the sequence of
-// textuual representaitons separated by a single newline.
+// textual representations separated by a single newline.
 func (ctx *textifyTraverseContext) renderEachChild(node *html.Node) (string, error) {
 	buf := &bytes.Buffer{}
 	for c := node.FirstChild; c != nil; c = c.NextSibling {
