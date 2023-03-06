@@ -1,4 +1,4 @@
-module html2text
+module github.com/ceearrashee/html2text
 
 go 1.20
 
