@@ -9,6 +9,8 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 const destPath = "testdata"
@@ -364,15 +366,19 @@ func TestStrippingLists(t *testing.T) {
 		},
 		{
 			"<ul><li>item</li></ul>_",
-			"* item\n\n_",
+			"• item\n\n_",
 		},
 		{
 			"<li class='123'>item 1</li> <li>item 2</li>\n_",
-			"* item 1\n* item 2\n_",
+			"• item 1\n• item 2\n_",
 		},
 		{
 			"<li>item 1</li> \t\n <li>item 2</li> <li> item 3</li>\n_",
-			"* item 1\n* item 2\n* item 3\n_",
+			"• item 1\n• item 2\n• item 3\n_",
+		},
+		{
+			"<ol><li>item 1</li> \t\n <li>item 2</li> <li> item 3</li></ol>",
+			"1. item 1\n2. item 2\n3. item 3",
 		},
 	}
 
@@ -577,19 +583,19 @@ func TestHeadings(t *testing.T) {
 	}{
 		{
 			"<h1>Test</h1>",
-			"****\nTest\n****",
+			"TEST",
 		},
 		{
 			"\t<h1>\nTest</h1> ",
-			"****\nTest\n****",
+			"TEST",
 		},
 		{
 			"\t<h1>\nTest line 1<br>Test 2</h1> ",
-			"***********\nTest line 1\nTest 2\n***********",
+			"TEST LINE 1\nTEST 2",
 		},
 		{
 			"<h1>Test</h1> <h1>Test</h1>",
-			"****\nTest\n****\n\n****\nTest\n****",
+			"TEST\n\n\nTEST",
 		},
 		{
 			"<h2>Test</h2>",
@@ -622,19 +628,19 @@ func TestBold(t *testing.T) {
 	}{
 		{
 			"<b>Test</b>",
-			"*Test*",
+			"Test",
 		},
 		{
 			"\t<b>Test</b> ",
-			"*Test*",
+			"Test",
 		},
 		{
 			"\t<b>Test line 1<br>Test 2</b> ",
-			"*Test line 1\nTest 2*",
+			"Test line 1\nTest 2",
 		},
 		{
 			"<b>Test</b> <b>Test</b>",
-			"*Test* *Test*",
+			"Test Test",
 		},
 	}
 
@@ -795,7 +801,7 @@ func TestText(t *testing.T) {
 			`<li>
 		  <a href="/new" data-ga-click="Header, create new repository, icon:repo"><span class="octicon octicon-repo"></span> New repository</a>
 		</li>`,
-			`\* New repository \( /new \)`,
+			`• New repository \( /new \)`,
 		},
 		{
 			`hi
@@ -813,15 +819,15 @@ func TestText(t *testing.T) {
 	</ul>
 `,
 			`hi
-hello google \( https://google.com \)
+hello google ( https://google.com )
 
 test
 
 List:
 
-\* Foo \( foo \)
-\* Barsoap \( http://www.microshwhat.com/bar/soapy \)
-\* Baz`,
+• Foo ( foo )
+• Barsoap ( http://www.microshwhat.com/bar/soapy )
+• Baz`,
 		},
 		// Malformed input html.
 		{
@@ -838,13 +844,13 @@ List:
 		        <li>Baz</li>
 			</ul>
 		`,
-			`hi hello google \( https://google.com \) test
+			`hi hello google ( https://google.com ) test
 
 List:
 
-\* Foo \( foo \)
-\* Bar \( /\n[ \t]+bar/baz \)
-\* Baz`,
+• Foo ( foo )
+• Bar ( \n[ \t]+bar/baz )
+• Baz`,
 		},
 	}
 
@@ -918,6 +924,7 @@ func match(input string, matcher StringMatcher, options ...Options) (string, err
 		return "", err
 	}
 	if !matcher.MatchString(text) {
+		diff := cmp.Diff(strings.Split(text, "\n"), strings.Split(matcher.String(), "\n"))
 		return "", fmt.Errorf(`error: input did not match specified expression
 Input:
 >>>>
@@ -932,10 +939,13 @@ Output:
 Expected:
 >>>>
 %v
-<<<<`,
+<<<<
+Diff:
+%v`,
 			input,
 			text,
 			matcher.String(),
+			diff,
 		)
 	}
 
