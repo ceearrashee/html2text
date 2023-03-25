@@ -2,6 +2,7 @@ package html2text
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"regexp"
 	"strings"
@@ -125,6 +126,7 @@ type textifyTraverseContext struct {
 	blockquoteLevel int
 	lineLength      int
 	isPre           bool
+	listItemIndex   uint
 }
 
 // tableTraverseContext holds table ASCII-form related context.
@@ -170,7 +172,7 @@ func (ctx *textifyTraverseContext) handleElement(node *html.Node) error {
 
 		divider := strings.Repeat(" ", dividerLen)
 
-		return ctx.emit("\n\n" + divider + "\n" + strings.ToUpper(str) +  "\n\n")
+		return ctx.emit("\n\n" + divider + "\n" + strings.ToUpper(str) + "\n\n")
 
 	case atom.Blockquote:
 		ctx.blockquoteLevel++
@@ -215,7 +217,8 @@ func (ctx *textifyTraverseContext) handleElement(node *html.Node) error {
 
 	case atom.Li:
 		if !ctx.options.TextOnly {
-			if err := ctx.emit("• "); err != nil {
+			err := ctx.processListItem(node.Parent)
+			if err != nil {
 				return err
 			}
 		}
@@ -266,10 +269,15 @@ func (ctx *textifyTraverseContext) handleElement(node *html.Node) error {
 		}
 
 		return ctx.emit(hrefLink)
+	case atom.P, atom.Ul, atom.Ol:
+		err := ctx.paragraphHandler(node)
+		if err != nil {
+			return err
+		}
 
-	case atom.P, atom.Ul:
-		return ctx.paragraphHandler(node)
+		ctx.listItemIndex = 0
 
+		return nil
 	case atom.Table, atom.Tfoot, atom.Th, atom.Tr, atom.Td:
 		if ctx.options.PrettyTables {
 			return ctx.handleTableElement(node)
@@ -291,6 +299,22 @@ func (ctx *textifyTraverseContext) handleElement(node *html.Node) error {
 	default:
 		return ctx.traverseChildren(node)
 	}
+}
+
+func (ctx *textifyTraverseContext) processListItem(parent *html.Node) error {
+	switch parent.DataAtom {
+	case atom.Ol:
+		ctx.listItemIndex++
+		if err := ctx.emit(fmt.Sprintf("%d. ", ctx.listItemIndex)); err != nil {
+			return err
+		}
+	default:
+		if err := ctx.emit("• "); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // paragraphHandler renders node children surrounded by double newlines.
